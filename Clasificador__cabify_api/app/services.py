@@ -72,6 +72,13 @@ def _extraer_doc_de_portafolio(coberturas: List[Dict[str, Any]]) -> Tuple[Option
     return None, None
 
 
+def _extraer_nun_poliza(coberturas: List[Dict[str, Any]]) -> str | None:
+    for c in coberturas:
+        num = c.get("NUMERO_POLIZA")
+        if num:
+            return str(num)
+
+
 # ========== OAuth / GraphQL ==========
 def _generar_token(timeout: int = 30) -> Optional[str]:
     """OAuth2 client_credentials."""
@@ -149,9 +156,36 @@ def consultar_portafolio(session: requests.Session, placa: str, timeout: int = 3
     body = {"documento": settings.DOCUMENTO, "placa": placa}
     try:
         resp = session.post(settings.API_URL, headers=headers, json=body, timeout=timeout)
+        print(resp)
         if resp.status_code != 200:
             return None, f"HTTP {resp.status_code}: {resp.text}"
         return resp.json(), None
+    except requests.RequestException as e:
+        return None, f"Network exception: {e}"
+
+import requests
+ # si usas Pydantic Settings
+
+def consultar_portafolio1(placa: str, timeout: int = 30):
+    url = settings.API_URL
+    headers = {
+        "x-api-key": settings.API_KEY,
+        "Content-Type": "application/json"
+    }
+    body = {
+        "documento": settings.DOCUMENTO,
+        "placa": placa
+    }
+
+    try:
+        resp = requests.post(url, headers=headers, json=body, timeout=timeout)
+        print(resp.text)
+
+        if resp.status_code != 200:
+            return None, f"HTTP {resp.status_code}: {resp.text}"
+
+        return resp.json(), None
+
     except requests.RequestException as e:
         return None, f"Network exception: {e}"
 
@@ -245,6 +279,29 @@ def clasificar_poliza_por_placa(session: requests.Session, placa: str) -> Dict[s
     # Documento para GraphQL
     numero_doc, tipo_doc = _extraer_doc_de_portafolio(coberturas)
     estado_poliza = _consultar_estado_poliza(session, tipo_doc or "CC", numero_doc) if numero_doc else None
+    numero_poliza = _extraer_nun_poliza(coberturas)
+    num_itau="890903937"
+    arbal ="901354352"
+    num_poliza_itau="1000489280219"
+
+    if  numero_doc == num_itau:
+         if numero_poliza == num_poliza_itau:
+             return {
+                 "clasificacion": "",
+                 "estado_poliza": "",
+                 "fuente": "api",
+                 "cobertura_368": "poliza Itau",
+                 "error": None,
+             }
+    elif numero_doc == arbal:
+        return {
+            "clasificacion": "",
+            "estado_poliza": "",
+            "fuente": "api",
+            "cobertura_368": "poliza Arbal",
+            "error": None,
+        }
+
 
     # Coberturas relevantes (IDs fijos)
     cobertura_rc = _find_coverage(coberturas, 370)   # RC
@@ -269,3 +326,4 @@ def clasificar_poliza_por_placa(session: requests.Session, placa: str) -> Dict[s
         "cobertura_368": bool(cobertura_368_ok),
         "error": None,
     }
+
