@@ -16,12 +16,11 @@ Servicios de clasificación por placa:
 """
 
 import base64
-import json
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
-from app.settings import settings
-from app.db import buscar_por_placa
+from Clasificador__cabify_api.app.settings import settings
+from Clasificador__cabify_api.app.db import buscar_por_placa
 
 # ========== Reglas usadas (solo PREMIUM / ESTANDAR) ==========
 REGLAS_PREMIUM = {
@@ -98,7 +97,7 @@ def _generar_token(timeout: int = 30) -> Optional[str]:
 
 
 def _consultar_estado_poliza(
-    session: requests.Session, tipo_documento: str, numero_documento: str, timeout: int = 40
+        session: requests.Session, tipo_documento: str, numero_documento: str, timeout: int = 40
 ) -> Optional[str]:
     token = _generar_token()
     if not token:
@@ -163,8 +162,11 @@ def consultar_portafolio(session: requests.Session, placa: str, timeout: int = 3
     except requests.RequestException as e:
         return None, f"Network exception: {e}"
 
+
 import requests
- # si usas Pydantic Settings
+
+
+# si usas Pydantic Settings
 
 def consultar_portafolio1(placa: str, timeout: int = 30):
     url = settings.API_URL
@@ -232,6 +234,7 @@ def clasificar_poliza_por_placa(session: requests.Session, placa: str) -> Dict[s
 
     # 1) Intentar BD primero
     fila = buscar_por_placa(placa)
+    print(fila)
     if fila:
         # buscar_por_placa debe devolver dict (no lista). Si devolviera lista, haz: fila = dict(fila[0]).
         colectiva_prefix = "COLECTIVA " if int(fila.get("codigo_riesgo", 0)) > 1 else ""
@@ -243,11 +246,39 @@ def clasificar_poliza_por_placa(session: requests.Session, placa: str) -> Dict[s
         else:
             tipo = "NO_CLASIFICADO"
 
+        resultado, err = consultar_portafolio(session, placa)
+        if err or not resultado:
+            return {
+                "clasificacion": "ERROR_EN_CONSULTA",
+                "estado_poliza": None,
+                "fuente": "api",
+                "cobertura_368": False,
+                "error": err or "Sin datos",
+            }
+
+        # Normaliza a lista de coberturas
+        if isinstance(resultado, dict):
+            coberturas: List[Dict[str, Any]] = list(resultado.values())
+        elif isinstance(resultado, list):
+            coberturas = resultado
+        else:
+            return {
+                "clasificacion": "ERROR_EN_CONSULTA",
+                "estado_poliza": None,
+                "fuente": "api",
+                "cobertura_368": False,
+                "error": "Formato desconocido",
+            }
+
+        cobertura_vhr = _find_coverage(coberturas, 368)  # VHR
+        cobertura_368_ok = cobertura_vhr is not None
+
+
         return {
             "clasificacion": f"{colectiva_prefix}{tipo}".strip(),
-            "estado_poliza": None,   # si quieres, puedes llamar GraphQL aquí
+            "estado_poliza": "ok",  # si quieres, puedes llamar GraphQL aquí
             "fuente": "bd",
-            "cobertura_368": False,  # desde BD no sabemos si existe la 368
+            "cobertura_368": bool(cobertura_368_ok),  # desde BD no sabemos si existe la 368
             "error": None,
         }
 
@@ -280,19 +311,19 @@ def clasificar_poliza_por_placa(session: requests.Session, placa: str) -> Dict[s
     numero_doc, tipo_doc = _extraer_doc_de_portafolio(coberturas)
     estado_poliza = _consultar_estado_poliza(session, tipo_doc or "CC", numero_doc) if numero_doc else None
     numero_poliza = _extraer_nun_poliza(coberturas)
-    num_itau="890903937"
-    arbal ="901354352"
-    num_poliza_itau="1000489280219"
+    num_itau = "890903937"
+    arbal = "901354352"
+    num_poliza_itau = "1000489280219"
 
-    if  numero_doc == num_itau:
-         if numero_poliza == num_poliza_itau:
-             return {
-                 "clasificacion": "",
-                 "estado_poliza": "",
-                 "fuente": "api",
-                 "cobertura_368": "poliza Itau",
-                 "error": None,
-             }
+    if numero_doc == num_itau:
+        if numero_poliza == num_poliza_itau:
+            return {
+                "clasificacion": "",
+                "estado_poliza": "",
+                "fuente": "api",
+                "cobertura_368": "poliza Itau",
+                "error": None,
+            }
     elif numero_doc == arbal:
         return {
             "clasificacion": "",
@@ -302,11 +333,11 @@ def clasificar_poliza_por_placa(session: requests.Session, placa: str) -> Dict[s
             "error": None,
         }
 
-
     # Coberturas relevantes (IDs fijos)
-    cobertura_rc = _find_coverage(coberturas, 370)   # RC
+    cobertura_rc = _find_coverage(coberturas, 370)  # RC
     cobertura_ded = _find_coverage(coberturas, 372)  # DED
     cobertura_vhr = _find_coverage(coberturas, 368)  # VHR
+
     cobertura_368_ok = cobertura_vhr is not None
 
     # Valores

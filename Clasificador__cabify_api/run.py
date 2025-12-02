@@ -2,7 +2,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from requests import Session
-from app.services import clasificar_poliza_por_placa
+from Clasificador__cabify_api.app.services import clasificar_poliza_por_placa
 
 app = FastAPI(title="Clasificador de Pólizas", version="1.0.0")
 

@@ -9,7 +9,7 @@ import requests
 BASE_URL = "http://127.0.0.1:8000"
 
 # 🔥 Placa fija a consultar
-placa = "PWL443"
+placa = "LTW649"
 
 def main():
     print(f"🚗 Consultando servicio para la placa {placa}...\n")

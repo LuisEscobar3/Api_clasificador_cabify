@@ -1,6 +1,6 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from app.settings import settings
+from Clasificador__cabify_api.app.settings import settings
 
 def ejecutar_consulta(query: str, params: tuple = None):
     conn = None
